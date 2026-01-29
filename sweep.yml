@@ -1,8 +1,8 @@
 method: bayes
-metric: 
-  name: validation/mape
-  goal: minimize
 
+metric: 
+  name: val/loss
+  goal: minimize
 
 parameters:
   # Data parameters
@@ -10,35 +10,35 @@ parameters:
     values: [64, 80, 128, 160, 224, 240]
   target_overlap_percentage:
     values: [0.0, 0.25, 0.5]
- 
   transform_name:
     values: ["none", "fft_dct", "mexican_hat"]
 
   # Model Architecture parameters
-  first_layer_channels:
-    values: [8, 16, 24]
-
+  num_conv_layers:
+    values: [3, 4, 5]
+  start_channels:
+    values: [16, 32, 64]
+  kernel_size:
+    values: [3, 5]
+  regressor_hidden_size:
+    values: [128, 256]
+  dropout:
+    values: [0.2, 0.5]
+  
   # Model Training parameters
-  epochs:
-    value: 100
   learning_rate:
     distribution: log_uniform_values
-    min: 1e-6
-    max: 0.5e-4
-  batch_size:
-    values: [8, 16, 32, 64]
-  loss_fn:
-    values: ["MSELoss", "L1Loss"]
-
-  # Model Regularization parameters
-  dropout:
-    values: [0.2, 0.4] # 0.5 is very aggressive, good for small data
+    min: 0.0001
+    max: 0.01
   weight_decay:
     distribution: log_uniform_values
-    min: 0.00001
-    max: 0.01      # Higher decay penalizes complex models more
+    min: 1e-6
+    max: 1e-3
+  batch_size:
+    values: [16, 32, 64]
 
 program: src/sweep_runner.py
+
 project: biofilm-cnn-pipeline-sweep-v1
 
 

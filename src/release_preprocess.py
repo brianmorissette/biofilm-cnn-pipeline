@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-import scipy.fft
+import scipy.fft, scipy.ndimage
 
 
 def extract_patches_auto(image, patch_size, target_overlap):
