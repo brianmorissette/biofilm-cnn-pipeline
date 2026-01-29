@@ -1,0 +1,83 @@
+_wandb:
+    value:
+        cli_version: 0.24.0
+        e:
+            ticee7fwslylnuoew9uvubbcmajjm9za:
+                args:
+                    - --batch_size=16
+                    - --dropout=0.5
+                    - --epochs=[50, 100]
+                    - --kernel_size=3
+                    - --learning_rate=0.0011066562637177676
+                    - --num_layers=4
+                    - --patch_size=128
+                    - --regressor_hidden_size=256
+                    - --start_channels=32
+                    - --target_overlap_pct=0
+                    - --transform_name=fft_dct
+                    - --weight_decay=2.3091602790938147e-06
+                codePath: src/train.py
+                codePathLocal: src/train.py
+                cpu_count: 4
+                cpu_count_logical: 8
+                disk:
+                    /:
+                        total: "1081101176832"
+                        used: "30161002496"
+                email: bmorissette8213@gmail.com
+                executable: /home/bmorissette/biofilm-cnn-pipeline/.venv/bin/python
+                git:
+                    commit: 731dcc3db895ae419a4feab04eda31b61ff73dea
+                    remote: https://github.com/brianmorissette/biofilm-cnn-pipeline.git
+                host: Brians-Yoga
+                memory:
+                    total: "8107819008"
+                os: Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.35
+                program: /home/bmorissette/biofilm-cnn-pipeline/src/train.py
+                python: CPython 3.12.11
+                root: /home/bmorissette/biofilm-cnn-pipeline
+                startedAt: "2026-01-29T00:40:24.188720Z"
+                writerId: ticee7fwslylnuoew9uvubbcmajjm9za
+        m: []
+        python_version: 3.12.11
+        t:
+            "1":
+                - 1
+                - 5
+                - 53
+            "2":
+                - 1
+                - 5
+                - 53
+            "3":
+                - 14
+            "4": 3.12.11
+            "5": 0.24.0
+            "12": 0.24.0
+            "13": linux-x86_64
+batch_size:
+    value: 16
+dropout:
+    value: 0.5
+epochs:
+    value:
+        - 50
+        - 100
+kernel_size:
+    value: 3
+learning_rate:
+    value: 0.0011066562637177676
+num_layers:
+    value: 4
+patch_size:
+    value: 128
+regressor_hidden_size:
+    value: 256
+start_channels:
+    value: 32
+target_overlap_pct:
+    value: 0
+transform_name:
+    value: fft_dct
+weight_decay:
+    value: 2.3091602790938147e-06

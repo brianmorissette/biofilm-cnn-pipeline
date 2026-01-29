@@ -1,0 +1,24 @@
+wandb_version: 1
+
+batch_size:
+  value: 16
+dropout:
+  value: 0.2
+kernel_size:
+  value: 3
+learning_rate:
+  value: 0.002579310498930929
+num_conv_layers:
+  value: 4
+patch_size:
+  value: 128
+regressor_hidden_size:
+  value: 128
+start_channels:
+  value: 16
+target_overlap_percentage:
+  value: 0.25
+transform_name:
+  value: mexican_hat
+weight_decay:
+  value: 2.604179142646795e-05

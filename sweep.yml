@@ -8,13 +8,13 @@ parameters:
   # Data parameters
   patch_size:
     values: [64, 80, 128, 160, 224, 240]
-  target_overlap_percentage:
+  target_overlap_pct:
     values: [0.0, 0.25, 0.5]
   transform_name:
     values: ["none", "fft_dct", "mexican_hat"]
 
   # Model Architecture parameters
-  num_conv_layers:
+  num_layers:
     values: [3, 4, 5]
   start_channels:
     values: [16, 32, 64]
@@ -36,10 +36,12 @@ parameters:
     max: 1e-3
   batch_size:
     values: [16, 32, 64]
+  epochs:
+    values: [50, 100]
 
-program: src/sweep_runner.py
+program: src/train.py
 
-project: biofilm-cnn-pipeline-sweep-v1
+project: biofilm-cnn-pipeline-sweep-v2
 
 
 

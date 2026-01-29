@@ -1,0 +1,9 @@
+2026-01-28 19:19:29,017 INFO    MainThread:30441 [wandb_setup.py:_flush():81] Current SDK version is 0.24.0
+2026-01-28 19:19:29,017 INFO    MainThread:30441 [wandb_setup.py:_flush():81] Configure stats pid to 30441
+2026-01-28 19:19:29,018 INFO    MainThread:30441 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2026-01-28 19:19:29,018 INFO    MainThread:30441 [wandb_init.py:setup_run_log_directory():717] Logging user logs to /home/bmorissette/biofilm-cnn-pipeline/wandb/run-20260128_191929-yfn2sit1/logs/debug.log
+2026-01-28 19:19:29,018 INFO    MainThread:30441 [wandb_init.py:setup_run_log_directory():718] Logging internal logs to /home/bmorissette/biofilm-cnn-pipeline/wandb/run-20260128_191929-yfn2sit1/logs/debug-internal.log
+2026-01-28 19:19:29,018 INFO    MainThread:30441 [wandb_init.py:init():844] calling init triggers
+2026-01-28 19:19:29,018 INFO    MainThread:30441 [wandb_init.py:init():849] wandb.init called with sweep_config: {'batch_size': 16, 'dropout': 0.2, 'kernel_size': 3, 'learning_rate': 0.0005212635581715536, 'num_conv_layers': 4, 'patch_size': 160, 'regressor_hidden_size': 128, 'start_channels': 64, 'target_overlap_percentage': 0, 'transform_name': 'mexican_hat', 'weight_decay': 1.7001769640530837e-06}
+config: {'_wandb': {}}
+2026-01-28 19:19:29,018 INFO    MainThread:30441 [wandb_init.py:init():892] starting backend

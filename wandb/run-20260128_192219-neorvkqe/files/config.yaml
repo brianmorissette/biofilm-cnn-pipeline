@@ -1,0 +1,78 @@
+_wandb:
+    value:
+        cli_version: 0.24.0
+        e:
+            5duf15snk7sigq9t1mn2bg0mopctibym:
+                args:
+                    - --batch_size=16
+                    - --dropout=0.2
+                    - --kernel_size=3
+                    - --learning_rate=0.001146622099180817
+                    - --num_conv_layers=5
+                    - --patch_size=128
+                    - --regressor_hidden_size=256
+                    - --start_channels=16
+                    - --target_overlap_percentage=0
+                    - --transform_name=mexican_hat
+                    - --weight_decay=0.00011413142318321543
+                codePath: src/train.py
+                codePathLocal: src/train.py
+                cpu_count: 4
+                cpu_count_logical: 8
+                disk:
+                    /:
+                        total: "1081101176832"
+                        used: "30160601088"
+                email: bmorissette8213@gmail.com
+                executable: /home/bmorissette/biofilm-cnn-pipeline/.venv/bin/python
+                git:
+                    commit: 731dcc3db895ae419a4feab04eda31b61ff73dea
+                    remote: https://github.com/brianmorissette/biofilm-cnn-pipeline.git
+                host: Brians-Yoga
+                memory:
+                    total: "8107819008"
+                os: Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.35
+                program: /home/bmorissette/biofilm-cnn-pipeline/src/train.py
+                python: CPython 3.12.11
+                root: /home/bmorissette/biofilm-cnn-pipeline
+                startedAt: "2026-01-29T00:22:19.330697Z"
+                writerId: 5duf15snk7sigq9t1mn2bg0mopctibym
+        m: []
+        python_version: 3.12.11
+        t:
+            "1":
+                - 1
+                - 5
+                - 53
+            "2":
+                - 1
+                - 5
+                - 53
+            "3":
+                - 14
+            "4": 3.12.11
+            "5": 0.24.0
+            "12": 0.24.0
+            "13": linux-x86_64
+batch_size:
+    value: 16
+dropout:
+    value: 0.2
+kernel_size:
+    value: 3
+learning_rate:
+    value: 0.001146622099180817
+num_conv_layers:
+    value: 5
+patch_size:
+    value: 128
+regressor_hidden_size:
+    value: 256
+start_channels:
+    value: 16
+target_overlap_percentage:
+    value: 0
+transform_name:
+    value: mexican_hat
+weight_decay:
+    value: 0.00011413142318321543

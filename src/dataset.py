@@ -17,14 +17,14 @@ def load_images(root) -> list[np.ndarray]:
     return [img for p in paths if (img := cv2.imread(str(p), cv2.IMREAD_UNCHANGED)) is not None]
 
     
-def _build_pairs(raw_pairs, patch_size, target_overlap, transform_name, rotate=True, label_min=None, label_max=None):    
+def _build_pairs(raw_pairs, patch_size, target_overlap_pct, transform_name, rotate=True, label_min=None, label_max=None):    
     """
     Builds (patch, label) pairs from raw images (biofilm, release).
 
     Args:
         raw_pairs: List of (biofilm, release) image tuples.
         patch_size: Pixel size of the patches. (e.g. 64, 80, 164)
-        target_overlap: Target overlap percentage for patch extraction.
+        target_overlap_pct: Target overlap percentage for patch extraction.
         transform_name: Name of the transform to apply to images (none, fft_dct, mexican_hat).
         rotate: Boolean if the patches should be rotated (true for train, false for val & test)
         label_min: Minimum label value for normalization (optional).
@@ -58,7 +58,7 @@ def _build_pairs(raw_pairs, patch_size, target_overlap, transform_name, rotate=T
     # 2) extract patches + rotations (original + 90/180/270) (rotate only for Train)
     samples = []
     for release, biofilm_label in pre_patch_pairs:
-        for patch in extract_patches_auto(release, patch_size=patch_size, target_overlap=target_overlap):
+        for patch in extract_patches_auto(release, patch_size=patch_size, target_overlap_pct=target_overlap_pct):
             samples.append((patch, biofilm_label))
             if rotate:
                 samples.append((rotate_image_90(patch), biofilm_label))
@@ -121,7 +121,7 @@ def get_dataloaders(root, cfg):
     train_samples, train_min, train_max, _ = _build_pairs(
         raw_pairs=train_raw,
         patch_size=cfg["patch_size"],
-        target_overlap=cfg["target_overlap"],
+        target_overlap_pct=cfg["target_overlap_pct"],
         transform_name=cfg["transform_name"],
     )
 
@@ -129,7 +129,7 @@ def get_dataloaders(root, cfg):
     validation_samples, _, _, validation_full_pairs = _build_pairs(
         raw_pairs=validation_raw,
         patch_size=cfg["patch_size"],
-        target_overlap=cfg["target_overlap"],
+        target_overlap_pct=cfg["target_overlap_pct"],
         transform_name=cfg["transform_name"],
         label_min=train_min,
         label_max=train_max,
@@ -138,7 +138,7 @@ def get_dataloaders(root, cfg):
     test_samples, _, _, test_full_pairs = _build_pairs(
         raw_pairs=test_raw,
         patch_size=cfg["patch_size"],
-        target_overlap=cfg["target_overlap"],
+        target_overlap_pct=cfg["target_overlap_pct"],
         transform_name=cfg["transform_name"],
         label_min=train_min,
         label_max=train_max,

@@ -1,0 +1,19 @@
+Running on cpu
+Traceback (most recent call last):
+  File "/home/bmorissette/biofilm-cnn-pipeline/src/train.py", line 186, in <module>
+    run(wandb.config)
+  File "/home/bmorissette/biofilm-cnn-pipeline/src/train.py", line 95, in run
+    test_full_pairs) = get_dataloaders(root_dir, cfg)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bmorissette/biofilm-cnn-pipeline/src/dataset.py", line 117, in get_dataloaders
+    train_raw, test_raw = train_test_split(raw_pairs, train_size=0.9, random_state=42, shuffle=True)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bmorissette/biofilm-cnn-pipeline/.venv/lib/python3.12/site-packages/sklearn/utils/_param_validation.py", line 218, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bmorissette/biofilm-cnn-pipeline/.venv/lib/python3.12/site-packages/sklearn/model_selection/_split.py", line 2924, in train_test_split
+    n_train, n_test = _validate_shuffle_split(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bmorissette/biofilm-cnn-pipeline/.venv/lib/python3.12/site-packages/sklearn/model_selection/_split.py", line 2504, in _validate_shuffle_split
+    raise ValueError(
+ValueError: With n_samples=0, test_size=None and train_size=0.9, the resulting train set will be empty. Adjust any of the aforementioned parameters.

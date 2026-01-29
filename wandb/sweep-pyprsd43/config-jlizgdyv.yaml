@@ -1,0 +1,24 @@
+wandb_version: 1
+
+batch_size:
+  value: 64
+dropout:
+  value: 0.2
+kernel_size:
+  value: 3
+learning_rate:
+  value: 0.00011649679991839268
+num_conv_layers:
+  value: 3
+patch_size:
+  value: 128
+regressor_hidden_size:
+  value: 128
+start_channels:
+  value: 16
+target_overlap_percentage:
+  value: 0.25
+transform_name:
+  value: fft_dct
+weight_decay:
+  value: 1.0954257266957737e-06

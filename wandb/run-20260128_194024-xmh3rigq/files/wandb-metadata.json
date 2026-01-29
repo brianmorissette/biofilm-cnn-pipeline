@@ -1,0 +1,42 @@
+{
+  "os": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+  "python": "CPython 3.12.11",
+  "startedAt": "2026-01-29T00:40:24.188720Z",
+  "args": [
+    "--batch_size=16",
+    "--dropout=0.5",
+    "--epochs=[50, 100]",
+    "--kernel_size=3",
+    "--learning_rate=0.0011066562637177676",
+    "--num_layers=4",
+    "--patch_size=128",
+    "--regressor_hidden_size=256",
+    "--start_channels=32",
+    "--target_overlap_pct=0",
+    "--transform_name=fft_dct",
+    "--weight_decay=2.3091602790938147e-06"
+  ],
+  "program": "/home/bmorissette/biofilm-cnn-pipeline/src/train.py",
+  "codePath": "src/train.py",
+  "codePathLocal": "src/train.py",
+  "git": {
+    "remote": "https://github.com/brianmorissette/biofilm-cnn-pipeline.git",
+    "commit": "731dcc3db895ae419a4feab04eda31b61ff73dea"
+  },
+  "email": "bmorissette8213@gmail.com",
+  "root": "/home/bmorissette/biofilm-cnn-pipeline",
+  "host": "Brians-Yoga",
+  "executable": "/home/bmorissette/biofilm-cnn-pipeline/.venv/bin/python",
+  "cpu_count": 4,
+  "cpu_count_logical": 8,
+  "disk": {
+    "/": {
+      "total": "1081101176832",
+      "used": "30161002496"
+    }
+  },
+  "memory": {
+    "total": "8107819008"
+  },
+  "writerId": "ticee7fwslylnuoew9uvubbcmajjm9za"
+}

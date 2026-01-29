@@ -48,7 +48,7 @@ def evaluate_full_images(model, full_pairs, cfg, device, label_min, label_max):
         patches = extract_patches_auto(
             full_image, 
             patch_size=cfg["patch_size"], 
-            target_overlap=cfg["target_overlap"]
+            target_overlap_pct=cfg["target_overlap_pct"]
         )
 
         # 2. Apply Transform (if any)
@@ -84,7 +84,7 @@ def run(cfg):
     print(f"Running on {device}")
 
     # 1. Data Loading
-    root_dir = "../data/processed" 
+    root_dir = "data/processed" 
     
     (train_loader, 
      val_loader, 
@@ -182,5 +182,5 @@ def run(cfg):
         #     wandb.save("best_model.pth")
 
 if __name__ == '__main__':
-    wandb.init(project="biofilm-cnn-pipeline-sweep-v1")
+    wandb.init(project="biofilm-cnn-pipeline-sweep-v2")
     run(wandb.config)

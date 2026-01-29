@@ -3,15 +3,15 @@ import cv2
 import scipy.fft, scipy.ndimage
 
 
-def extract_patches_auto(image, patch_size, target_overlap):
+def extract_patches_auto(image, patch_size, target_overlap_pct):
     """
     Automatically calculates the number of patches needed to achieve 
-    'target_overlap' while ensuring the 4 corners are locked and no pixels are lost.
+    'target_overlap_pct' while ensuring the 4 corners are locked and no pixels are lost.
     
     Args:
         image (np.ndarray): Input image.
         patch_size (int): Size of the patch (height and width).
-        target_overlap (float): Desired overlap (e.g., 0.25 for 25%).
+        target_overlap_pct (float): Desired overlap (e.g., 0.25 for 25%).
 
     Returns:
         List of extracted patches (np.ndarray(H,W) float in [0,1]).
@@ -33,8 +33,8 @@ def extract_patches_auto(image, patch_size, target_overlap):
         min_required = int(np.ceil(dimension / p_size))
         return max(n, min_required)
 
-    n_x = calculate_n(w, patch_size, target_overlap)
-    n_y = calculate_n(h, patch_size, target_overlap)
+    n_x = calculate_n(w, patch_size, target_overlap_pct)
+    n_y = calculate_n(h, patch_size, target_overlap_pct)
 
     # --- Step 2: Compute Actual Overlaps (for reporting) ---
     
