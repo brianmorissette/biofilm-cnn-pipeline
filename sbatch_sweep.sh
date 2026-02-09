@@ -14,7 +14,7 @@
 #SBATCH --mem=128gb
 
 # Point to Turing's data directory
-export DATA_ROOT=/project/ejstewart/biofilm-ml-mqp
+export DATA_ROOT=/project/ejstewart/biofilm-ml-mqp/processed
 
 # Run a python program using our local virtual environment
 cd /home/bfmorissette/biofilm-cnn-pipeline
