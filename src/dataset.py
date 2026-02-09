@@ -28,14 +28,14 @@ def _load_spinning_disk_2d_pairs(root):
 
     Args:
         root: Root directory containing 'biofilm/release_biomass_mapping.csv'
-              and 'release/2D_corrected/' image folder.
+              and 'release/2D/' image folder.
 
     Returns:
         List of (image, biomass) tuples where image is a numpy array and
         biomass is a float.
     """
     csv_path = Path(root) / "biofilm" / "release_biomass_mapping.csv"
-    image_dir = Path(root) / "release" / "2D_corrected"
+    image_dir = Path(root) / "release" / "2D"
 
     pairs = []
     skipped = 0

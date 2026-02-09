@@ -1,4 +1,5 @@
 import copy
+import os
 
 import torch
 import torch.nn as nn
@@ -342,14 +343,16 @@ def run(cfg):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Running on {device}")
 
-    # 1. Determine root directory
+    # 1. Determine root directory (DATA_ROOT env var overrides defaults)
     data_source = cfg["data_source"]
-    if data_source in ("keyence", "keyence_clearest"):
-        root_dir = "data/keyence/processed"
-    elif data_source == "spinning_disk":
-        root_dir = "data/spinning_disk/processed"
-    else:
-        raise ValueError(f"Unknown data_source: {data_source}")
+    root_dir = os.environ.get("DATA_ROOT")
+    if root_dir is None:
+        if data_source in ("keyence", "keyence_clearest"):
+            root_dir = "data/keyence/processed"
+        elif data_source == "spinning_disk":
+            root_dir = "data/spinning_disk/processed"
+        else:
+            raise ValueError(f"Unknown data_source: {data_source}")
 
     n_folds = cfg.get("n_folds", 5)
 
