@@ -1,0 +1,52 @@
+method: bayes
+
+metric: 
+  name: val/mean_loss
+  goal: minimize
+
+parameters:
+  # Data parameters
+  data_source: 
+    value: spinning_disk
+
+  # Release Cell preprocessing parameters
+  patch_size:
+    values: [128, 256]
+  target_overlap_pct:
+    values: [0.10, 0.25]
+  transform_name:
+    value: none
+
+  # K-Fold cross validation
+  n_folds:
+    value: 5
+
+  # Model Architecture parameters
+  num_layers:
+    values: [3, 4, 5]
+  start_channels:
+    values: [16, 32]
+  kernel_size:
+    values: [3, 5]
+  regressor_hidden_size:
+    values: [128, 256]
+  dropout:
+    values: [0.3, 0.5]
+  
+  # Model Training parameters
+  learning_rate:
+    distribution: log_uniform_values
+    min: 0.0001
+    max: 0.001
+  weight_decay:
+    distribution: log_uniform_values
+    min: 1e-4
+    max: 1e-2
+  batch_size:
+    values: [32, 64]
+  epochs:
+    value: 300
+
+program: src/train.py
+
+project: biofilm-cnn-pipeline-sweep-spinning-disk-v1
