@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import scipy.fft, scipy.ndimage
+from skimage import filters
 
 
 def extract_patches_auto(image, patch_size, target_overlap_pct):
@@ -86,6 +87,8 @@ def apply_transform(image, transform_name):
         return fft_dct(image)
     elif transform_name == "mexican_hat":
         return mexican_hat(image)
+    elif transform_name == "gabor":
+        return gabor(image)
     else:
         raise ValueError(f"Invalid transform: {transform_name}")
 
@@ -107,3 +110,12 @@ def mexican_hat(image, size=21, sigma=3.0):
     kernel = kernel / (kernel_sum if kernel_sum != 0 else 1.0)
     transformed_image = scipy.ndimage.convolve(image, kernel, mode="reflect")
     return transformed_image
+
+def gabor(image):
+    """Applies Gabor filter to the image."""
+    real, imag = filters.gabor(image, frequency=0.5)
+    magnitude = np.sqrt(real**2 + imag**2)
+    return magnitude
+
+
+

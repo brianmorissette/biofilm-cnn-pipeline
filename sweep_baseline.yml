@@ -1,0 +1,44 @@
+method: grid
+
+parameters:
+  # Data parameters
+  data_source: 
+    value: spinning_disk
+
+  # Release Cell preprocessing parameters
+  patch_size:
+    value: 256
+  target_overlap_pct:
+    value: 0.10
+  transform_name:
+    values: ["none", "fft_dct", "mexican_hat", "gabor"]
+
+  # K-Fold cross validation
+  n_folds:
+    value: 5
+
+  # Model Architecture parameters
+  num_layers:
+    value: 5
+  start_channels:
+    value: 16
+  kernel_size:
+    value: 3
+  regressor_hidden_size:
+    value: 256
+  dropout:
+    value: 0.5
+  
+  # Model Training parameters
+  learning_rate:
+    value: 0.0006452318262624954
+  weight_decay:
+    value: 0.0001833987631585841
+  batch_size:
+    value: 32
+  epochs:
+    value: 300
+
+program: src/train.py
+
+project: biofilm-cnn-pipeline-sweep-spinning-disk-transform-testing
