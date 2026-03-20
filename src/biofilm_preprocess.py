@@ -11,12 +11,14 @@ def preprocess_biofilm(
     blur_ksize=(5, 5),
 ):
     """
-    Preprocesses a biofilm image with configurable enhancement and blur methods.
+    Preprocesses a biofilm image with a fixed pipeline:
+    - CLAHE contrast enhancement
+    - Gaussian blur
 
     Args:
         image: Input image.
-        enhancement_method: Contrast enhancement method ("clahe", "histogram_eq", "none").
-        blur_method: Blurring method ("gaussian", "median", "none").
+        enhancement_method: Must be "clahe".
+        blur_method: Must be "gaussian".
         clip_limit: CLAHE clip limit (only used if enhancement_method="clahe").
         tile_size: CLAHE tile grid size (only used if enhancement_method="clahe").
         blur_ksize: Blur kernel size (used for gaussian and median blur).
@@ -30,16 +32,13 @@ def preprocess_biofilm(
     else:
         gray_image = image
 
-    # Apply contrast enhancement
-    if enhancement_method == "clahe":
-        clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_size)
-        enhanced_image = clahe.apply(gray_image)
-    elif enhancement_method == "histogram_eq":
-        enhanced_image = cv2.equalizeHist(gray_image)
-    elif enhancement_method == "none":
-        enhanced_image = gray_image
-    else:
-        raise ValueError(f"Unknown enhancement_method: {enhancement_method}")
+    # Enforce fixed enhancement method
+    if enhancement_method != "clahe":
+        raise ValueError(
+            f"Only enhancement_method='clahe' is supported, got: {enhancement_method}"
+        )
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_size)
+    enhanced_image = clahe.apply(gray_image)
 
     # Normalize to 0-255
     normalized_image = cv2.normalize(
@@ -51,17 +50,12 @@ def preprocess_biofilm(
         dtype=cv2.CV_8U,
     )
 
-    # Apply blur
-    if blur_method == "gaussian":
-        preprocessed_image = cv2.GaussianBlur(normalized_image, blur_ksize, 0)
-    elif blur_method == "median":
-        # medianBlur requires an odd integer kernel size
-        ksize = blur_ksize[0] if isinstance(blur_ksize, tuple) else blur_ksize
-        preprocessed_image = cv2.medianBlur(normalized_image, ksize)
-    elif blur_method == "none":
-        preprocessed_image = normalized_image
-    else:
-        raise ValueError(f"Unknown blur_method: {blur_method}")
+    # Enforce fixed blur method
+    if blur_method != "gaussian":
+        raise ValueError(
+            f"Only blur_method='gaussian' is supported, got: {blur_method}"
+        )
+    preprocessed_image = cv2.GaussianBlur(normalized_image, blur_ksize, 0)
 
     return preprocessed_image
 
@@ -130,11 +124,11 @@ def get_adaptive_threshold_mask(image, block_size=11, c_constant=2):
 
 def get_surface_area(image, threshold_method):
     """
-    Calculate the biofilm surface area in square microns using the specified threshold method.
+    Calculate the biofilm surface area in square microns using iterative thresholding.
     
     Args:
         image: Preprocessed grayscale image.
-        threshold_method: Thresholding method ("isodata", "otsu", or "adaptive").
+        threshold_method: Must be "iterative" (or "isodata" alias for compatibility).
         
     Returns:
         Surface area in square microns.
@@ -142,18 +136,14 @@ def get_surface_area(image, threshold_method):
     # 1.13x1.13 is the pixel size in microns
     pixel_area = 1.13 * 1.13
     
-    if threshold_method == "adaptive":
-        # Adaptive thresholding returns a binary mask directly
-        binary_mask = get_adaptive_threshold_mask(image)
-        foreground_pixels = np.sum(binary_mask == 255)
-    elif threshold_method == "otsu":
-        threshold = get_otsu_threshold_value(image)
-        foreground_pixels = np.sum(image > threshold)
-    elif threshold_method == "isodata":
-        threshold = get_iterative_threshold_value(image)
-        foreground_pixels = np.sum(image > threshold)
-    else:
-        raise ValueError(f"Unknown threshold method: {threshold_method}")
+    if threshold_method not in ("iterative", "isodata"):
+        raise ValueError(
+            "Only threshold_method='iterative' is supported "
+            f"(or 'isodata' alias), got: {threshold_method}"
+        )
+
+    threshold = get_iterative_threshold_value(image)
+    foreground_pixels = np.sum(image > threshold)
     
     return foreground_pixels * pixel_area
 

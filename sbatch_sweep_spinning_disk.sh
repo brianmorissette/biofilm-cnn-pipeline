@@ -18,4 +18,4 @@ export DATA_ROOT=/project/ejstewart/biofilm-ml-mqp/processed
 
 # Run a python program using our local virtual environment
 cd /home/bfmorissette/biofilm-cnn-pipeline
-/home/bfmorissette/.local/bin/uv run -- wandb agent brianmorissette-worcester-polytechnic-institute/biofilm-cnn-pipeline-sweep-spinning-disk-transform-testing/t7i8zwp0
+/home/bfmorissette/.local/bin/uv run -- wandb agent brianmorissette-worcester-polytechnic-institute/biofilm-cnn-pipeline-sweep-spinning-disk-v3/poz6186k

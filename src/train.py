@@ -1,4 +1,5 @@
 import copy
+import csv
 import os
 
 import torch
@@ -9,7 +10,7 @@ import wandb
 import matplotlib.pyplot as plt
 
 from model import DynamicCNN
-from dataset import get_kfold_data, _build_pairs_spinning_disk, _build_pairs_keyence
+from dataset import get_kfold_data, _build_pairs_spinning_disk, _build_pairs_keyence, ImageLabelDataset
 from release_preprocess import extract_patches_auto, apply_transform
 
 
@@ -34,6 +35,28 @@ def calculate_mape(pred, target, epsilon=1e-7):
     return torch.mean(torch.abs((pred - target) / (target + epsilon))) * 100
 
 
+def calculate_r2(pred, target):
+    """Coefficient of determination (R²). Scale-independent."""
+    if not isinstance(pred, torch.Tensor):
+        pred = torch.tensor(pred, dtype=torch.float32)
+    if not isinstance(target, torch.Tensor):
+        target = torch.tensor(target, dtype=torch.float32)
+    ss_res = torch.sum((target - pred) ** 2)
+    ss_tot = torch.sum((target - torch.mean(target)) ** 2)
+    return (1 - ss_res / ss_tot).item() if ss_tot > 0 else 0.0
+
+
+def calculate_nrmse(pred, target):
+    """RMSE normalized by label range. Scale-independent."""
+    if not isinstance(pred, torch.Tensor):
+        pred = torch.tensor(pred, dtype=torch.float32)
+    if not isinstance(target, torch.Tensor):
+        target = torch.tensor(target, dtype=torch.float32)
+    rmse = torch.sqrt(torch.mean((pred - target) ** 2))
+    label_range = target.max() - target.min()
+    return (rmse / label_range).item() if label_range > 0 else float("inf")
+
+
 # ---------------------------------------------------------------------------
 # Evaluation helpers
 # ---------------------------------------------------------------------------
@@ -51,7 +74,7 @@ def evaluate_full_images(model, full_pairs, cfg, device, label_min, label_max):
     image_mapes = []
     image_losses = []
 
-    for full_image, full_label in full_pairs:
+    for full_image, full_label, *_ in full_pairs:
         # 1. Extract patches
         patches = extract_patches_auto(
             full_image,
@@ -91,7 +114,7 @@ def final_evaluation(model, full_pairs, cfg, device, label_min, label_max):
     model.eval()
     results = []
 
-    for idx, (full_image, full_label) in enumerate(full_pairs):
+    for idx, (full_image, full_label, filename) in enumerate(full_pairs):
         patches = extract_patches_auto(
             full_image,
             patch_size=cfg["patch_size"],
@@ -119,6 +142,7 @@ def final_evaluation(model, full_pairs, cfg, device, label_min, label_max):
 
         results.append({
             "image_idx": idx,
+            "filename": filename,
             "predicted": pred_orig,
             "actual": target_orig,
             "abs_error": abs_error,
@@ -139,7 +163,7 @@ def log_detailed_results(results, full_pairs, prefix="val"):
     - Summary statistics
     """
     # 1. Predictions table
-    columns = ["image_idx", "predicted", "actual", "abs_error", "pct_error", "patch_std"]
+    columns = ["image_idx", "filename", "predicted", "actual", "abs_error", "pct_error", "patch_std"]
     table_data = [[r[col] for col in columns] for r in results]
     table = wandb.Table(columns=columns, data=table_data)
     wandb.log({f"{prefix}/predictions_table": table})
@@ -226,6 +250,8 @@ def train_fold(
     best_val_loss = float("inf")
     best_state = None
     best_epoch = 0
+    train_losses = []
+    val_losses_per_epoch = []
 
     prefix = f"fold_{fold_idx + 1}" if n_folds > 1 else "train"
 
@@ -267,6 +293,9 @@ def train_fold(
                 all_val_targets.append(targets.cpu())
 
         epoch_val_loss = val_running_loss / len(val_loader.dataset)
+
+        train_losses.append(epoch_train_loss)
+        val_losses_per_epoch.append(epoch_val_loss)
 
         # Correct MAPE: compute once over all predictions
         all_val_preds = torch.cat(all_val_preds)
@@ -332,7 +361,49 @@ def train_fold(
         "model_state": best_state,
         "label_min": label_min,
         "label_max": label_max,
+        "train_losses": train_losses,
+        "val_losses": val_losses_per_epoch,
     }
+
+
+# ---------------------------------------------------------------------------
+# Final retraining (no validation, fixed epochs)
+# ---------------------------------------------------------------------------
+
+def train_final(model, train_loader, cfg, device, n_epochs):
+    """Train on all train+val data for a fixed number of epochs.
+
+    No early stopping, no validation, no scheduler — just train.
+    Used after CV to retrain the best hyperparams on maximum data.
+    """
+    optimizer = optim.AdamW(
+        model.parameters(),
+        lr=cfg["learning_rate"],
+        weight_decay=cfg.get("weight_decay", 1e-4),
+    )
+    criterion = nn.L1Loss()
+
+    for epoch in range(n_epochs):
+        model.train()
+        running_loss = 0.0
+        for inputs, targets in train_loader:
+            inputs, targets = inputs.to(device), targets.to(device)
+            targets = targets.view(-1, 1)
+            optimizer.zero_grad()
+            preds = model(inputs)
+            loss = criterion(preds, targets)
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item() * inputs.size(0)
+
+        epoch_loss = running_loss / len(train_loader.dataset)
+        wandb.log({"final/train_loss": epoch_loss, "final/epoch": epoch + 1})
+
+        if (epoch + 1) % 25 == 0 or epoch == 0:
+            print(f"  [Final retrain] Epoch {epoch + 1}/{n_epochs} | "
+                  f"Train Loss: {epoch_loss:.5f}")
+
+    return model
 
 
 # ---------------------------------------------------------------------------
@@ -360,7 +431,7 @@ def run(cfg):
     wandb.config.update({"root_dir": root_dir}, allow_val_change=True)
 
     # 2. Load k-fold data
-    folds, test_raw = get_kfold_data(root_dir, cfg, n_folds=n_folds)
+    folds, test_raw, trainval_raw = get_kfold_data(root_dir, cfg, n_folds=n_folds)
     print(f"Data loaded: {n_folds} folds, {len(test_raw)} test images.")
 
     # 3. Train each fold
@@ -415,70 +486,131 @@ def run(cfg):
     print(f"Image MAPE:    {summary['val/mean_image_mape']:.2f}% +/- {summary['val/std_image_mape']:.2f}%")
     print(f"Best epochs:   {best_epochs}")
 
-    # 5. Test evaluation with the best fold's model
-    if best_fold_result is not None:
-        print(f"\n{'='*60}")
-        print(f"TEST EVALUATION (using best fold model)")
-        print(f"{'='*60}")
-
-        best_model = DynamicCNN(
-            patch_size=cfg["patch_size"],
-            kernel_size=cfg["kernel_size"],
-            start_channels=cfg["start_channels"],
-            num_layers=cfg["num_layers"],
-            regressor_hidden_size=cfg["regressor_hidden_size"],
-            dropout=cfg["dropout"],
-        ).to(device)
-        best_model.load_state_dict(best_fold_result["model_state"])
-        best_label_min = best_fold_result["label_min"]
-        best_label_max = best_fold_result["label_max"]
-
-        # Build test pairs using the best fold's normalization bounds
-        if data_source == "spinning_disk":
-            _, _, _, test_full_pairs = _build_pairs_spinning_disk(
-                raw_pairs=test_raw,
-                patch_size=cfg["patch_size"],
-                target_overlap_pct=cfg["target_overlap_pct"],
-                transform_name=cfg.get("transform_name", "none"),
-                label_min=best_label_min,
-                label_max=best_label_max,
-            )
-        else:  # keyence
-            _, _, _, test_full_pairs = _build_pairs_keyence(
-                raw_pairs=test_raw,
-                patch_size=cfg["patch_size"],
-                target_overlap_pct=cfg["target_overlap_pct"],
-                transform_name=cfg.get("transform_name", "none"),
-                threshold_method=cfg["threshold_method"],
-                blur_method=cfg["blur_method"],
-                enhancement_method=cfg["enhancement_method"],
-                label_min=best_label_min,
-                label_max=best_label_max,
-            )
-
-        test_results = final_evaluation(
-            best_model, test_full_pairs, cfg, device,
-            best_label_min, best_label_max,
-        )
-        log_detailed_results(test_results, test_full_pairs, prefix="test")
-
-        test_mapes = [r["pct_error"] for r in test_results]
+    # 5. Log mean train/val loss curves across folds
+    max_epochs = max(len(r["train_losses"]) for r in fold_results)
+    for epoch in range(max_epochs):
+        train_vals = [r["train_losses"][epoch] for r in fold_results if epoch < len(r["train_losses"])]
+        val_vals = [r["val_losses"][epoch] for r in fold_results if epoch < len(r["val_losses"])]
         wandb.log({
-            "test/mean_mape": float(np.mean(test_mapes)),
-            "test/median_mape": float(np.median(test_mapes)),
+            "cv/mean_train_loss": float(np.mean(train_vals)),
+            "cv/mean_val_loss": float(np.mean(val_vals)),
+            "cv/epoch": epoch + 1,
         })
-        print(f"Test MAPE: {np.mean(test_mapes):.2f}% "
-              f"(median {np.median(test_mapes):.2f}%)")
 
-        # Save best model as W&B artifact
-        model_path = "best_model.pth"
-        torch.save(best_fold_result["model_state"], model_path)
-        artifact = wandb.Artifact("best-model", type="model")
-        artifact.add_file(model_path)
-        wandb.log_artifact(artifact)
-        print(f"Best model saved as W&B artifact.")
+    # 6. Retrain on all train+val data
+    avg_best_epoch = int(round(np.mean(best_epochs)))
+    print(f"\n{'='*60}")
+    print(f"FINAL RETRAIN (all train+val, {avg_best_epoch} epochs)")
+    print(f"{'='*60}")
+
+    # Build full training set from trainval_raw
+    if data_source == "spinning_disk":
+        full_train_samples, full_label_min, full_label_max, _ = _build_pairs_spinning_disk(
+            raw_pairs=trainval_raw,
+            patch_size=cfg["patch_size"],
+            target_overlap_pct=cfg["target_overlap_pct"],
+            transform_name=cfg.get("transform_name", "none"),
+        )
+    else:  # keyence
+        full_train_samples, full_label_min, full_label_max, _ = _build_pairs_keyence(
+            raw_pairs=trainval_raw,
+            patch_size=cfg["patch_size"],
+            target_overlap_pct=cfg["target_overlap_pct"],
+            transform_name=cfg.get("transform_name", "none"),
+            threshold_method=cfg["threshold_method"],
+            blur_method=cfg["blur_method"],
+            enhancement_method=cfg["enhancement_method"],
+        )
+
+    use_pin_memory = torch.cuda.is_available()
+    full_train_loader = torch.utils.data.DataLoader(
+        ImageLabelDataset(full_train_samples, rotate=True),
+        batch_size=cfg["batch_size"],
+        shuffle=True,
+        num_workers=2,
+        pin_memory=use_pin_memory,
+    )
+
+    final_model = DynamicCNN(
+        patch_size=cfg["patch_size"],
+        kernel_size=cfg["kernel_size"],
+        start_channels=cfg["start_channels"],
+        num_layers=cfg["num_layers"],
+        regressor_hidden_size=cfg["regressor_hidden_size"],
+        dropout=cfg["dropout"],
+    ).to(device)
+
+    final_model = train_final(final_model, full_train_loader, cfg, device, avg_best_epoch)
+
+    # 7. Test evaluation with retrained model
+    print(f"\n{'='*60}")
+    print(f"TEST EVALUATION (retrained model)")
+    print(f"{'='*60}")
+
+    if data_source == "spinning_disk":
+        _, _, _, test_full_pairs = _build_pairs_spinning_disk(
+            raw_pairs=test_raw,
+            patch_size=cfg["patch_size"],
+            target_overlap_pct=cfg["target_overlap_pct"],
+            transform_name=cfg.get("transform_name", "none"),
+            label_min=full_label_min,
+            label_max=full_label_max,
+        )
+    else:  # keyence
+        _, _, _, test_full_pairs = _build_pairs_keyence(
+            raw_pairs=test_raw,
+            patch_size=cfg["patch_size"],
+            target_overlap_pct=cfg["target_overlap_pct"],
+            transform_name=cfg.get("transform_name", "none"),
+            threshold_method=cfg["threshold_method"],
+            blur_method=cfg["blur_method"],
+            enhancement_method=cfg["enhancement_method"],
+            label_min=full_label_min,
+            label_max=full_label_max,
+        )
+
+    test_results = final_evaluation(
+        final_model, test_full_pairs, cfg, device,
+        full_label_min, full_label_max,
+    )
+    log_detailed_results(test_results, test_full_pairs, prefix="test")
+
+    # Scale-independent metrics
+    preds = torch.tensor([r["predicted"] for r in test_results])
+    actuals = torch.tensor([r["actual"] for r in test_results])
+    test_mapes = [r["pct_error"] for r in test_results]
+
+    wandb.log({
+        "test/r2": calculate_r2(preds, actuals),
+        "test/nrmse": calculate_nrmse(preds, actuals),
+        "test/mean_mape": float(np.mean(test_mapes)),
+        "test/median_mape": float(np.median(test_mapes)),
+    })
+    print(f"Test R²: {calculate_r2(preds, actuals):.4f}")
+    print(f"Test NRMSE: {calculate_nrmse(preds, actuals):.4f}")
+    print(f"Test MAPE: {np.mean(test_mapes):.2f}% "
+          f"(median {np.median(test_mapes):.2f}%)")
+
+    # Save predictions to local CSV
+    os.makedirs("outputs", exist_ok=True)
+    csv_path = f"outputs/{data_source}_{wandb.run.id}_predictions.csv"
+    with open(csv_path, "w", newline="") as f:
+        fieldnames = ["filename", "predicted", "actual", "abs_error", "pct_error"]
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(test_results)
+    wandb.save(csv_path)
+    print(f"Predictions saved to {csv_path}")
+
+    # Save final model as W&B artifact
+    model_path = "best_model.pth"
+    torch.save(final_model.state_dict(), model_path)
+    artifact = wandb.Artifact("best-model", type="model")
+    artifact.add_file(model_path)
+    wandb.log_artifact(artifact)
+    print(f"Final model saved as W&B artifact.")
 
 
 if __name__ == "__main__":
-    wandb.init(project="biofilm-cnn-pipeline-sweep-spinning-disk-v1")
+    wandb.init()
     run(wandb.config)

@@ -23,7 +23,7 @@ parameters:
 
   # Model Architecture parameters
   num_layers:
-    values: [3, 4, 5]
+    values: [3, 4]
   start_channels:
     values: [16, 32]
   kernel_size:
@@ -36,7 +36,7 @@ parameters:
   # Model Training parameters
   learning_rate:
     distribution: log_uniform_values
-    min: 0.0001
+    min: 0.00001
     max: 0.001
   weight_decay:
     distribution: log_uniform_values
@@ -47,6 +47,8 @@ parameters:
   epochs:
     value: 300
 
+run_cap: 50
+
 program: src/train.py
 
-project: biofilm-cnn-pipeline-sweep-spinning-disk-v1
+project: biofilm-cnn-pipeline-sweep-spinning-disk-v3
