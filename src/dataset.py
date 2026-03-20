@@ -451,12 +451,22 @@ def get_kfold_data(root, cfg, n_folds=5):
     else:
         raise ValueError(f"Unknown data_source: {data_source}")
 
+    if len(raw_pairs) == 0:
+        raise RuntimeError(
+            f"No images found for data_source='{data_source}' in root='{root}'. "
+            f"Check that the data directory exists and contains the expected files."
+        )
+
     # ---- Extract labels for stratified split ----
     labels_for_stratify = _extract_labels_for_stratification(raw_pairs, data_source, cfg)
     n_bins = min(10, len(raw_pairs) // 2)
-    percentiles = np.linspace(0, 100, n_bins + 1)[1:-1]
-    bin_edges = np.percentile(labels_for_stratify, percentiles)
-    bins = np.digitize(labels_for_stratify, bin_edges)
+    if n_bins < 2:
+        # Too few samples to stratify meaningfully — fall back to unstratified
+        bins = None
+    else:
+        percentiles = np.linspace(0, 100, n_bins + 1)[1:-1]
+        bin_edges = np.percentile(labels_for_stratify, percentiles)
+        bins = np.digitize(labels_for_stratify, bin_edges)
 
     # ---- Hold out 10% as fixed test set (stratified) ----
     trainval_raw, test_raw = train_test_split(

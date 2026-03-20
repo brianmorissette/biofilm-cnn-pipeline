@@ -14,8 +14,8 @@
 #SBATCH --mem=128gb
 
 # Point to Turing's data directory
-export DATA_ROOT=/project/ejstewart/biofilm-ml-mqp/processed
+export DATA_ROOT=/project/ejstewart/biofilm-ml-mqp/spinning_disk/processed
 
 # Run a python program using our local virtual environment
 cd /home/bfmorissette/biofilm-cnn-pipeline
-/home/bfmorissette/.local/bin/uv run -- wandb agent brianmorissette-worcester-polytechnic-institute/biofilm-cnn-pipeline-sweep-spinning-disk-v3/poz6186k
+/home/bfmorissette/.local/bin/uv run -- wandb agent brianmorissette-worcester-polytechnic-institute/biofilm-cnn-pipeline-sweep-spinning-disk-v3/pm5b7o03

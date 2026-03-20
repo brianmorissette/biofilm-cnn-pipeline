@@ -313,17 +313,7 @@ def train_fold(
         current_lr = optimizer.param_groups[0]["lr"]
         scheduler.step(epoch_val_loss)
 
-        # --- LOGGING ---
-        log_dict = {
-            "epoch": epoch + 1,
-            f"{prefix}/train_loss": epoch_train_loss,
-            f"{prefix}/val_loss": epoch_val_loss,
-            f"{prefix}/val_patch_mape": epoch_patch_mape,
-            f"{prefix}/val_image_mape": epoch_image_mape,
-            f"{prefix}/learning_rate": current_lr,
-        }
-        wandb.log(log_dict)
-
+        # --- LOGGING (console only, W&B logging done after all folds) ---
         print(f"  [{prefix}] Epoch {epoch + 1}/{cfg['epochs']} | "
               f"Train Loss: {epoch_train_loss:.5f} | "
               f"Val Loss: {epoch_val_loss:.5f} | "
@@ -414,7 +404,9 @@ def run(cfg):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Running on {device}")
 
-    # 1. Determine root directory (DATA_ROOT env var overrides defaults)
+    # 1. Determine root directory
+    # DATA_ROOT points directly to the processed data for a given dataset.
+    # If not set, fall back to local data/<dataset>/processed directory.
     data_source = cfg["data_source"]
     root_dir = os.environ.get("DATA_ROOT")
     if root_dir is None:
@@ -424,6 +416,7 @@ def run(cfg):
             root_dir = "data/spinning_disk/processed"
         else:
             raise ValueError(f"Unknown data_source: {data_source}")
+    print(f"Data root: {root_dir}")
 
     n_folds = cfg.get("n_folds", 5)
 
@@ -436,8 +429,6 @@ def run(cfg):
 
     # 3. Train each fold
     fold_results = []
-    best_overall_loss = float("inf")
-    best_fold_result = None
 
     for fold_idx, (train_loader, val_loader, val_full_pairs, label_min, label_max) in enumerate(folds):
         print(f"\n{'='*60}")
@@ -460,10 +451,6 @@ def run(cfg):
         )
         fold_results.append(result)
 
-        if result["best_val_loss"] < best_overall_loss:
-            best_overall_loss = result["best_val_loss"]
-            best_fold_result = result
-
     # 4. Log cross-fold summary
     val_losses = [r["best_val_loss"] for r in fold_results]
     image_mapes = [r["final_image_mape"] for r in fold_results]
@@ -474,7 +461,7 @@ def run(cfg):
         "val/std_loss": float(np.std(val_losses)),
         "val/mean_image_mape": float(np.mean(image_mapes)),
         "val/std_image_mape": float(np.std(image_mapes)),
-        "val/best_fold_loss": best_overall_loss,
+        "val/best_fold_loss": float(np.min(val_losses)),
         "training/mean_best_epoch": float(np.mean(best_epochs)),
     }
     wandb.log(summary)
