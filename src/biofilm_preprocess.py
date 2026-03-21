@@ -4,8 +4,6 @@ import numpy as np
 
 def preprocess_biofilm(
     image,
-    enhancement_method,
-    blur_method,
     clip_limit=2.0,
     tile_size=(8, 8),
     blur_ksize=(5, 5),
@@ -17,11 +15,9 @@ def preprocess_biofilm(
 
     Args:
         image: Input image.
-        enhancement_method: Must be "clahe".
-        blur_method: Must be "gaussian".
-        clip_limit: CLAHE clip limit (only used if enhancement_method="clahe").
-        tile_size: CLAHE tile grid size (only used if enhancement_method="clahe").
-        blur_ksize: Blur kernel size (used for gaussian and median blur).
+        clip_limit: CLAHE clip limit.
+        tile_size: CLAHE tile grid size.
+        blur_ksize: Gaussian blur kernel size.
 
     Returns:
         Preprocessed image.
@@ -32,11 +28,6 @@ def preprocess_biofilm(
     else:
         gray_image = image
 
-    # Enforce fixed enhancement method
-    if enhancement_method != "clahe":
-        raise ValueError(
-            f"Only enhancement_method='clahe' is supported, got: {enhancement_method}"
-        )
     clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_size)
     enhanced_image = clahe.apply(gray_image)
 
@@ -50,11 +41,6 @@ def preprocess_biofilm(
         dtype=cv2.CV_8U,
     )
 
-    # Enforce fixed blur method
-    if blur_method != "gaussian":
-        raise ValueError(
-            f"Only blur_method='gaussian' is supported, got: {blur_method}"
-        )
     preprocessed_image = cv2.GaussianBlur(normalized_image, blur_ksize, 0)
 
     return preprocessed_image
@@ -86,49 +72,12 @@ def get_iterative_threshold_value(image):
     return int(round(current_threshold))
 
 
-def get_otsu_threshold_value(image):
-    """
-    Calculates an optimal threshold using Otsu's method.
-    
-    Otsu's method maximizes inter-class variance between foreground and background.
-    """
-    thresh_val, _ = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    return int(thresh_val)
-
-
-def get_adaptive_threshold_mask(image, block_size=11, c_constant=2):
-    """
-    Applies adaptive thresholding and returns a binary mask.
-    
-    Adaptive thresholding calculates a different threshold for each pixel
-    based on the local neighborhood, making it effective for images with
-    varying illumination.
-    
-    Args:
-        image: Input grayscale image (uint8).
-        block_size: Size of the pixel neighborhood for threshold calculation (must be odd).
-        c_constant: Constant subtracted from the mean.
-        
-    Returns:
-        Binary mask where foreground pixels are 255.
-    """
-    return cv2.adaptiveThreshold(
-        image,
-        255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY,
-        block_size,
-        c_constant,
-    )
-
-
-def get_surface_area(image, threshold_method):
+def get_surface_area(image):
     """
     Calculate the biofilm surface area in square microns using iterative thresholding.
     
     Args:
         image: Preprocessed grayscale image.
-        threshold_method: Must be "iterative" (or "isodata" alias for compatibility).
         
     Returns:
         Surface area in square microns.
@@ -136,12 +85,6 @@ def get_surface_area(image, threshold_method):
     # 1.13x1.13 is the pixel size in microns
     pixel_area = 1.13 * 1.13
     
-    if threshold_method not in ("iterative", "isodata"):
-        raise ValueError(
-            "Only threshold_method='iterative' is supported "
-            f"(or 'isodata' alias), got: {threshold_method}"
-        )
-
     threshold = get_iterative_threshold_value(image)
     foreground_pixels = np.sum(image > threshold)
     

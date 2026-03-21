@@ -42,7 +42,7 @@ Each sweep run executes `src/train.py` with a hyperparameter config from W&B:
      b. Preprocess images (keyence: CLAHE+blur on biofilm, green channel on release; SD: grayscale normalize)
      c. Compute labels (keyence: surface area from biofilm; SD: biomass from CSV)
      d. Normalize labels to [0,1] using TRAIN fold's min/max
-     e. Extract patches from release images (with configurable overlap)
+     e. Extract patches from release images
      f. Train DynamicCNN with early stopping (patience=30) and ReduceLROnPlateau
      g. Record per-epoch train/val losses for this fold
      h. Record best val loss and best epoch for this fold
@@ -77,6 +77,7 @@ Each sweep run executes `src/train.py` with a hyperparameter config from W&B:
 - **`run(cfg)`** — Orchestrates the full pipeline: CUDA validation, hyperparameter summary, data loading, k-fold CV, loss curve logging, final retrain, test evaluation
 - **`train_fold()`** — Single fold training loop with early stopping. Per-epoch console logs show train loss, val loss, and LR. Returns per-epoch losses, best model state, best epoch. Does NOT log to W&B (console only)
 - **`train_final()`** — Simple training loop for final retraining. Fixed epoch count, no early stopping, no validation. Logs `final/train_loss` to W&B
+- **`evaluate_full_images()`** — Image-level evaluation: extract patches, predict, average per image
 - **`final_evaluation()`** — Detailed per-image results with filenames for test set logging
 - **`log_detailed_results()`** — Logs prediction table and scatter plot to W&B
 - **Metrics:** `calculate_r2()`, `calculate_mae()` — all handle both tensors and scalars
@@ -108,7 +109,7 @@ Each sweep run executes `src/train.py` with a hyperparameter config from W&B:
 - **`normalize_labels()`** — Min-max normalization to [0,1]. Accepts optional min/max for consistent normalization across splits
 
 ### `src/release_preprocess.py` — Patch extraction and transforms
-- **`extract_patches_auto()`** — Calculates patch grid to achieve target overlap. Uses `np.linspace` for even distribution, locks all 4 corners. No pixel loss
+- **`extract_patches_auto()`** — Calculates patch grid with locked corners and no pixel loss. Uses `np.linspace` for even distribution
 - **Rotation functions:** `rotate_image_90/180/270()` — Used by `ImageLabelDataset` for on-the-fly augmentation
 - **Transforms (not used in baseline sweeps):**
   - `fft_dct()` — Discrete Cosine Transform
@@ -121,26 +122,25 @@ Both datasets use the same structure with tuned ranges:
 
 ### `sweep_keyence.yml`
 - Method: Bayesian optimization, minimize `val/mean_loss`
-- run_cap: 50
-- patch_size: [64, 128] (smaller images)
-- Fixed: data_source=keyence, transform_name=none, enhancement_method=clahe, blur_method=gaussian, threshold_method=iterative, n_folds=3, epochs=300
+- run_cap: 100
+- patch_size: [64, 128, 256] (smaller images)
+- Fixed: data_source=keyence, transform_name=none, n_folds=3, epochs=300
 
 ### `sweep_spinning_disk.yml`
 - Method: Bayesian optimization, minimize `val/mean_loss`
-- run_cap: 50
-- patch_size: [128, 256] (larger images)
+- run_cap: 100
+- patch_size: [128, 256, 512] (larger images)
 - Fixed: data_source=spinning_disk, transform_name=none, n_folds=3, epochs=300
 
 ### Shared hyperparameter search space
 | Parameter | Values/Range |
 |---|---|
-| num_layers | [3, 4] |
-| start_channels | [16, 32] |
+| num_layers | [3, 4, 5] |
+| start_channels | [16, 32, 64] |
 | kernel_size | [3, 5] |
-| regressor_hidden_size | [128, 256] |
-| dropout | [0.3, 0.5] |
-| target_overlap_pct | [0.10, 0.25] |
-| batch_size | [32, 64] |
+| regressor_hidden_size | [64, 128, 256] |
+| dropout | [0.1, 0.3, 0.5] |
+| batch_size | [16, 32, 64] |
 | learning_rate | log_uniform [1e-5, 1e-3] |
 | weight_decay | log_uniform [1e-4, 1e-2] |
 
@@ -197,6 +197,6 @@ The sbatch scripts request: 1 GPU, 8 CPU cores, 128GB memory, short partition (2
 - **No per-fold W&B logging:** Only mean loss curves across folds are logged to W&B. Per-fold metrics are printed to console only. This keeps the W&B dashboard clean
 - **Image-level evaluation:** Patches are extracted from full images, predicted individually, then averaged per image. This is the primary evaluation granularity
 - **Two test metrics:** R² (scale-independent model quality) and MAE (physically interpretable error in original units). NRMSE and MAPE were dropped — NRMSE is redundant with R², and MAPE is unreliable when labels approach zero
-- **3-fold CV:** Reduces per-run training time by 40% vs 5-fold. Provides sufficient validation set sizes for both datasets (keyence: ~48 images/fold, spinning disk: ~220 images/fold)
+- **3-fold CV:** Reduces per-run training time by 40% vs 5-fold. Provides sufficient validation set sizes for both datasets (keyence: ~48 images/fold, spinning disk: ~221 images/fold)
 - **Transforms disabled for baseline:** `transform_name=none` in both sweep configs. Transforms (FFT-DCT, Mexican Hat, Gabor) exist in code for future A/B testing
 - **On-the-fly rotation augmentation:** Training data is augmented 4x via 90-degree rotations applied in `ImageLabelDataset.__getitem__()`, avoiding RAM overhead

@@ -56,7 +56,6 @@ def final_evaluation(model, full_pairs, cfg, device, label_min, label_max):
         patches = extract_patches_auto(
             full_image,
             patch_size=cfg["patch_size"],
-            target_overlap_pct=cfg["target_overlap_pct"],
         )
 
         transform_name = cfg.get("transform_name", "none")
@@ -314,7 +313,7 @@ def run(cfg):
     print(f"HYPERPARAMETERS")
     print(f"{'='*60}")
     hp_keys = ["patch_size", "num_layers", "start_channels", "kernel_size",
-               "regressor_hidden_size", "dropout", "target_overlap_pct",
+               "regressor_hidden_size", "dropout",
                "batch_size", "learning_rate", "weight_decay"]
     for key in hp_keys:
         if key in cfg:
@@ -390,18 +389,13 @@ def run(cfg):
         full_train_samples, full_label_min, full_label_max, _ = _build_pairs_spinning_disk(
             raw_pairs=trainval_raw,
             patch_size=cfg["patch_size"],
-            target_overlap_pct=cfg["target_overlap_pct"],
             transform_name=cfg.get("transform_name", "none"),
         )
     else:  # keyence
         full_train_samples, full_label_min, full_label_max, _ = _build_pairs_keyence(
             raw_pairs=trainval_raw,
             patch_size=cfg["patch_size"],
-            target_overlap_pct=cfg["target_overlap_pct"],
             transform_name=cfg.get("transform_name", "none"),
-            threshold_method=cfg["threshold_method"],
-            blur_method=cfg["blur_method"],
-            enhancement_method=cfg["enhancement_method"],
         )
 
     use_pin_memory = torch.cuda.is_available()
@@ -433,7 +427,6 @@ def run(cfg):
         _, _, _, test_full_pairs = _build_pairs_spinning_disk(
             raw_pairs=test_raw,
             patch_size=cfg["patch_size"],
-            target_overlap_pct=cfg["target_overlap_pct"],
             transform_name=cfg.get("transform_name", "none"),
             label_min=full_label_min,
             label_max=full_label_max,
@@ -442,11 +435,7 @@ def run(cfg):
         _, _, _, test_full_pairs = _build_pairs_keyence(
             raw_pairs=test_raw,
             patch_size=cfg["patch_size"],
-            target_overlap_pct=cfg["target_overlap_pct"],
             transform_name=cfg.get("transform_name", "none"),
-            threshold_method=cfg["threshold_method"],
-            blur_method=cfg["blur_method"],
-            enhancement_method=cfg["enhancement_method"],
             label_min=full_label_min,
             label_max=full_label_max,
         )
