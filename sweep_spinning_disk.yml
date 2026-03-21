@@ -19,7 +19,7 @@ parameters:
 
   # K-Fold cross validation
   n_folds:
-    value: 5
+    value: 3
 
   # Model Architecture parameters
   num_layers:
@@ -51,4 +51,4 @@ run_cap: 50
 
 program: src/train.py
 
-project: biofilm-cnn-pipeline-sweep-spinning-disk-v3
+project: biofilm-cnn-pipeline-sweep-spinning-disk-v4

@@ -24,7 +24,7 @@ parameters:
     value: iterative
   # K-Fold cross validation
   n_folds:
-    value: 5
+    value: 3
   # Model Architecture parameters
   num_layers:
     values: [3, 4]
@@ -54,4 +54,4 @@ run_cap: 50
 
 program: src/train.py
 
-project: biofilm-cnn-pipeline-sweep-keyence-v1
+project: biofilm-cnn-pipeline-sweep-keyence-v2

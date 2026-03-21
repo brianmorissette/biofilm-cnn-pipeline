@@ -417,14 +417,14 @@ def _extract_labels_for_stratification(raw_pairs, data_source, cfg):
         return labels
 
 
-def get_kfold_data(root, cfg, n_folds=5):
+def get_kfold_data(root, cfg, n_folds=3):
     """
     Build k-fold cross-validation data with a held-out test set.
 
     Flow:
         1. Load all raw pairs.
-        2. Hold out 10% as a fixed test set.
-        3. K-Fold split the remaining 90% into train/val for each fold.
+        2. Hold out 20% as a fixed test set (stratified by label quartiles).
+        3. K-Fold split the remaining 80% into train/val for each fold.
         4. Build (patch, label) samples per fold.
 
     Args:
@@ -459,25 +459,21 @@ def get_kfold_data(root, cfg, n_folds=5):
 
     # ---- Extract labels for stratified split ----
     labels_for_stratify = _extract_labels_for_stratification(raw_pairs, data_source, cfg)
-    n_bins = min(10, len(raw_pairs) // 2)
-    if n_bins < 2:
-        # Too few samples to stratify meaningfully — fall back to unstratified
-        bins = None
-    else:
-        percentiles = np.linspace(0, 100, n_bins + 1)[1:-1]
-        bin_edges = np.percentile(labels_for_stratify, percentiles)
-        bins = np.digitize(labels_for_stratify, bin_edges)
+    n_bins = 4
+    percentiles = np.linspace(0, 100, n_bins + 1)[1:-1]
+    bin_edges = np.percentile(labels_for_stratify, percentiles)
+    bins = np.digitize(labels_for_stratify, bin_edges)
 
-    # ---- Hold out 10% as fixed test set (stratified) ----
+    # ---- Hold out 20% as fixed test set (stratified) ----
     trainval_raw, test_raw = train_test_split(
-        raw_pairs, train_size=0.9, random_state=42, shuffle=True,
+        raw_pairs, train_size=0.80, random_state=42, shuffle=True,
         stratify=bins,
     )
 
     print(f"Total images: {len(raw_pairs)} | "
           f"Train+Val: {len(trainval_raw)} | Test: {len(test_raw)}")
 
-    # ---- K-Fold on the remaining 90% ----
+    # ---- K-Fold on the remaining 80% ----
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
     trainval_arr = np.array(trainval_raw, dtype=object)
 

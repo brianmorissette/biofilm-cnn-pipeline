@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project predicts biofilm properties from microscopy images using a CNN regression pipeline. It supports two independent microscopy datasets, runs Bayesian hyperparameter sweeps with 5-fold cross-validation via Weights & Biases, and produces per-image predicted vs actual values for final evaluation.
+This project predicts biofilm properties from microscopy images using a CNN regression pipeline. It supports two independent microscopy datasets, runs Bayesian hyperparameter sweeps with 3-fold cross-validation via Weights & Biases, and produces per-image predicted vs actual values for final evaluation.
 
 **Goal:** Given a 2D "release cell" microscopy image, predict a continuous biofilm measurement (surface area for keyence, biomass for spinning disk).
 
@@ -33,10 +33,10 @@ Each sweep run executes `src/train.py` with a hyperparameter config from W&B:
    Load all raw image pairs with filenames
 
 2. STRATIFIED TEST SPLIT
-   Hold out 10% as fixed test set (stratified by label quantiles, random_state=42)
-   Remaining 90% = trainval set
+   Hold out 20% as fixed test set (stratified by label quartiles, n_bins=4, random_state=42)
+   Remaining 80% = trainval set
 
-3. 5-FOLD CROSS-VALIDATION (on the 90%)
+3. 3-FOLD CROSS-VALIDATION (on the 80%)
    For each fold:
      a. Split trainval into train/val at image level
      b. Preprocess images (keyence: CLAHE+blur on biofilm, green channel on release; SD: grayscale normalize)
@@ -49,14 +49,14 @@ Each sweep run executes `src/train.py` with a hyperparameter config from W&B:
 
 4. LOG CROSS-FOLD SUMMARY TO W&B
    val/mean_loss (THIS IS THE SWEEP METRIC - Bayesian optimization minimizes this)
-   val/std_loss, val/mean_image_mape, val/std_image_mape
+   val/std_loss
 
 5. LOG MEAN LOSS CURVES
    Average train/val loss across all folds per epoch -> cv/mean_train_loss, cv/mean_val_loss
    (For visualizing overfitting across the sweep)
 
 6. RETRAIN FINAL MODEL
-   Compute avg_best_epoch = round(mean of best epochs across 5 folds)
+   Compute avg_best_epoch = round(mean of best epochs across 3 folds)
    Build full training set from ALL trainval data (no validation split)
    Train a fresh DynamicCNN for exactly avg_best_epoch epochs (no early stopping, no scheduler)
    Label normalization uses full trainval min/max
@@ -64,8 +64,8 @@ Each sweep run executes `src/train.py` with a hyperparameter config from W&B:
 7. TEST EVALUATION
    Build test pairs using trainval's label min/max
    For each test image: extract patches -> predict -> average patch predictions = image prediction
-   Log to W&B: predictions table (with filenames), scatter plot, error histogram, best/worst images
-   Log metrics: R², NRMSE, MAPE (all scale-independent, comparable across datasets)
+   Log to W&B: predictions table (with filenames), scatter plot
+   Log metrics: R², MAE
    Save local CSV: outputs/{dataset}_{run_id}_predictions.csv
    Save model as W&B artifact
 ```
@@ -74,13 +74,12 @@ Each sweep run executes `src/train.py` with a hyperparameter config from W&B:
 
 ### `src/train.py` — Main training script
 - **Entry point:** `wandb.init()` then `run(wandb.config)`
-- **`run(cfg)`** — Orchestrates the full pipeline: data loading, k-fold CV, loss curve logging, final retrain, test evaluation
-- **`train_fold()`** — Single fold training loop with early stopping. Returns per-epoch losses (for mean curves), best model state, best epoch. Does NOT log to W&B (console only)
+- **`run(cfg)`** — Orchestrates the full pipeline: CUDA validation, hyperparameter summary, data loading, k-fold CV, loss curve logging, final retrain, test evaluation
+- **`train_fold()`** — Single fold training loop with early stopping. Per-epoch console logs show train loss, val loss, and LR. Returns per-epoch losses, best model state, best epoch. Does NOT log to W&B (console only)
 - **`train_final()`** — Simple training loop for final retraining. Fixed epoch count, no early stopping, no validation. Logs `final/train_loss` to W&B
-- **`evaluate_full_images()`** — Image-level evaluation: extract patches, predict, average per image
 - **`final_evaluation()`** — Detailed per-image results with filenames for test set logging
-- **`log_detailed_results()`** — Logs prediction table, scatter plot, error histogram, best/worst images to W&B
-- **Metrics:** `calculate_mape()`, `calculate_r2()`, `calculate_nrmse()` — all handle both tensors and scalars
+- **`log_detailed_results()`** — Logs prediction table and scatter plot to W&B
+- **Metrics:** `calculate_r2()`, `calculate_mae()` — all handle both tensors and scalars
 - **DATA_ROOT env var:** Points directly to the dataset's processed directory. If not set, defaults to `data/{dataset}/processed/`
 
 ### `src/dataset.py` — Data loading and splitting
@@ -124,13 +123,13 @@ Both datasets use the same structure with tuned ranges:
 - Method: Bayesian optimization, minimize `val/mean_loss`
 - run_cap: 50
 - patch_size: [64, 128] (smaller images)
-- Fixed: data_source=keyence, transform_name=none, enhancement_method=clahe, blur_method=gaussian, threshold_method=iterative, n_folds=5, epochs=300
+- Fixed: data_source=keyence, transform_name=none, enhancement_method=clahe, blur_method=gaussian, threshold_method=iterative, n_folds=3, epochs=300
 
 ### `sweep_spinning_disk.yml`
 - Method: Bayesian optimization, minimize `val/mean_loss`
 - run_cap: 50
 - patch_size: [128, 256] (larger images)
-- Fixed: data_source=spinning_disk, transform_name=none, n_folds=5, epochs=300
+- Fixed: data_source=spinning_disk, transform_name=none, n_folds=3, epochs=300
 
 ### Shared hyperparameter search space
 | Parameter | Values/Range |
@@ -148,21 +147,17 @@ Both datasets use the same structure with tuned ranges:
 ## W&B Metrics Logged Per Run
 
 ### During training (after all folds complete)
-- `val/mean_loss` — **Primary sweep metric.** Mean best val loss across 5 folds
-- `val/std_loss`, `val/mean_image_mape`, `val/std_image_mape`, `val/best_fold_loss`
-- `training/mean_best_epoch`
+- `val/mean_loss` — **Primary sweep metric.** Mean best val loss across 3 folds
+- `val/std_loss` — Cross-fold stability check (high std = unreliable mean)
 - `cv/mean_train_loss`, `cv/mean_val_loss` — Per-epoch mean across folds (for overfitting analysis)
 
 ### During final retrain
 - `final/train_loss`, `final/epoch` — Per-epoch training loss on full trainval data
 
 ### Test evaluation
-- `test/r2`, `test/nrmse`, `test/mean_mape`, `test/median_mape`
-- `test/predictions_table` — Table with filename, predicted, actual, abs_error, pct_error, patch_std
+- `test/r2`, `test/mae`
+- `test/predictions_table` — Table with filename, predicted, actual
 - `test/pred_vs_actual` — Scatter plot
-- `test/error_histogram` — Distribution of percentage errors
-- `test/best_predictions`, `test/worst_predictions` — Top/bottom 5 images
-- `test/final_mean_error`, `test/final_median_error`, `test/final_max_error`, `test/final_min_error`
 
 ## Running Sweeps
 
@@ -197,10 +192,11 @@ The sbatch scripts request: 1 GPU, 8 CPU cores, 128GB memory, short partition (2
 
 ## Key Design Decisions
 
-- **Stratified test split:** Labels are binned into quantiles and stratified so the test set is representative of the full label distribution
+- **Stratified test split:** Labels are binned into 4 quartiles and stratified so the test set is representative of the full label distribution (n_bins=4, hardcoded)
 - **Retrain after CV:** The final model is retrained from scratch on all train+val data for avg_best_epoch epochs (no early stopping). This maximizes training data and avoids fold-selection bias
 - **No per-fold W&B logging:** Only mean loss curves across folds are logged to W&B. Per-fold metrics are printed to console only. This keeps the W&B dashboard clean
 - **Image-level evaluation:** Patches are extracted from full images, predicted individually, then averaged per image. This is the primary evaluation granularity
-- **Scale-independent metrics:** R², MAPE, and NRMSE allow direct comparison between keyence (surface area in sq microns) and spinning disk (biomass) results
+- **Two test metrics:** R² (scale-independent model quality) and MAE (physically interpretable error in original units). NRMSE and MAPE were dropped — NRMSE is redundant with R², and MAPE is unreliable when labels approach zero
+- **3-fold CV:** Reduces per-run training time by 40% vs 5-fold. Provides sufficient validation set sizes for both datasets (keyence: ~48 images/fold, spinning disk: ~220 images/fold)
 - **Transforms disabled for baseline:** `transform_name=none` in both sweep configs. Transforms (FFT-DCT, Mexican Hat, Gabor) exist in code for future A/B testing
 - **On-the-fly rotation augmentation:** Training data is augmented 4x via 90-degree rotations applied in `ImageLabelDataset.__getitem__()`, avoiding RAM overhead
