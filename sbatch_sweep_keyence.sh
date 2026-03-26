@@ -18,4 +18,4 @@ export DATA_ROOT=/project/ejstewart/biofilm-ml-mqp/keyence/processed
 
 # Run a python program using our local virtual environment
 cd /home/bfmorissette/biofilm-cnn-pipeline
-/home/bfmorissette/.local/bin/uv run -- wandb agent brianmorissette-worcester-polytechnic-institute/biofilm-cnn-pipeline-sweep-keyence-trans-v1/vnwb0j9p
+/home/bfmorissette/.local/bin/uv run -- wandb agent brianmorissette-worcester-polytechnic-institute/biofilm-cnn-pipeline-sweep-keyence-trans-v2/rtqzv77g
