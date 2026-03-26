@@ -49,4 +49,4 @@ run_cap: 100
  
 program: src/train.py
  
-project: biofilm-cnn-pipeline-sweep-spinning-disk-v5
+project: biofilm-cnn-pipeline-sweep-spinning-disk-v6
