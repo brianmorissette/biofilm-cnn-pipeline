@@ -37,10 +37,10 @@ parameters:
   epochs:
     value: 300
 
-repeat_id:
-  values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  repeat_id:
+    values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
  
 program: src/train.py
  
-project: biofilm-cnn-pipeline-sweep-keyence-trans-v2
+project: biofilm-cnn-pipeline-sweep-keyence-trans-v3
 
