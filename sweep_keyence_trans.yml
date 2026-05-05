@@ -1,0 +1,46 @@
+method: grid
+ 
+parameters:
+  # Data parameters
+  data_source:
+    value: keyence
+
+  # Release Cell preprocessing parameters
+  patch_size:
+    value: 128
+  transform_name:
+    values: ["none", "fft_dct", "mexican_hat", "gabor"]
+
+  # K-Fold cross validation
+  n_folds:
+    value: 3
+
+  # Model Architecture parameters
+  num_layers:
+    value: 5
+  start_channels:
+    value: 16
+  kernel_size:
+    value: 5
+  regressor_hidden_size:
+    value: 256
+  dropout:
+    value: 0.1
+    
+  # Model Training parameters
+  learning_rate:
+    value: 0.0007163694923747869
+  weight_decay:
+    value: 0.0003676566950479888
+  batch_size:
+    value: 16
+  epochs:
+    value: 300
+
+  repeat_id:
+    values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+ 
+program: src/train.py
+ 
+project: biofilm-cnn-pipeline-sweep-keyence-trans-v3
+

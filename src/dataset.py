@@ -14,9 +14,12 @@ from biofilm_preprocess import preprocess_biofilm, get_surface_area, normalize_l
 def load_keyence_images(root):
     """
     Loads all .tif images from the specified root directory and its subdirectories for Keyence data.
+
+    Returns:
+        List of (image, filename_stem) tuples.
     """
     paths = sorted([*Path(root).rglob("*.tif")], key=lambda p: p.as_posix().casefold())
-    return [img for p in paths if (img := cv2.imread(str(p), cv2.IMREAD_UNCHANGED)) is not None]
+    return [(img, p.stem) for p in paths if (img := cv2.imread(str(p), cv2.IMREAD_UNCHANGED)) is not None]
     
 
 def _load_spinning_disk_2d_pairs(root):
@@ -31,8 +34,8 @@ def _load_spinning_disk_2d_pairs(root):
               and 'release/2D/' image folder.
 
     Returns:
-        List of (image, biomass) tuples where image is a numpy array and
-        biomass is a float.
+        List of (image, biomass, filename) tuples where image is a numpy array,
+        biomass is a float, and filename is the image filename string.
     """
     csv_path = Path(root) / "biofilm" / "release_biomass_mapping.csv"
     image_dir = Path(root) / "release" / "2D"
@@ -59,7 +62,7 @@ def _load_spinning_disk_2d_pairs(root):
                 skipped += 1
                 print(f"Warning: could not load {img_path} ({e}), skipping.")
                 continue
-            pairs.append((img, biomass))
+            pairs.append((img, biomass, filename))
 
     print(f"Loaded {len(pairs)} spinning disk 2D pairs ({skipped} skipped).")
     return pairs
@@ -68,11 +71,7 @@ def _load_spinning_disk_2d_pairs(root):
 def _build_pairs_keyence(
     raw_pairs,
     patch_size,
-    target_overlap_pct,
     transform_name,
-    threshold_method,
-    blur_method,
-    enhancement_method,
     label_min=None,
     label_max=None,
 ):    
@@ -83,47 +82,41 @@ def _build_pairs_keyence(
     by ImageLabelDataset instead.
 
     Args:
-        raw_pairs: List of (biofilm, release) image tuples.
+        raw_pairs: List of (biofilm, release, filename) tuples.
         patch_size: Pixel size of the patches. (e.g. 64, 80, 164)
-        target_overlap_pct: Target overlap percentage for patch extraction.
         transform_name: Name of the transform to apply to images (none, fft_dct, mexican_hat).
-        threshold_method: Thresholding method for biofilm ("isodata", "otsu", or "adaptive").
-        blur_method: Blur method for biofilm preprocessing ("gaussian", "median", "none").
-        enhancement_method: Contrast enhancement method ("clahe", "histogram_eq", "none").
         label_min: Minimum label value for normalization (optional).
         label_max: Maximum label value for normalization (optional).
-    
+
     Returns:
         Tuple of (samples, label_min, label_max, pre_patch_pairs), where samples is a list of (patch, label) tuples,
-        and pre_patch_pairs is a list of (full image, label) tuples
-    """    
+        and pre_patch_pairs is a list of (full image, label, filename) tuples
+    """
     # 1) Per-image preprocessing + label (no patches yet)
     all_release = []
     all_labels = []
-    for biofilm, release in raw_pairs:
+    all_filenames = []
+    for biofilm, release, fname in raw_pairs:
         # release -> grayscale + normalize
         grayscale_release = release[:, :, 1].astype(np.float32)
         normalized_release = grayscale_release / np.max(grayscale_release)
         all_release.append(normalized_release)
 
         # biofilm -> preprocess + threshold + label (surface area)
-        preprocessed_biofilm = preprocess_biofilm(
-            biofilm,
-            enhancement_method,
-            blur_method,
-        )
-        surface_area = get_surface_area(preprocessed_biofilm, threshold_method)
+        preprocessed_biofilm = preprocess_biofilm(biofilm)
+        surface_area = get_surface_area(preprocessed_biofilm)
         all_labels.append(surface_area)
+        all_filenames.append(fname)
 
     # normalize the labels 0-1
     normalized_labels, label_min, label_max = normalize_labels(all_labels, min_val=label_min, max_val=label_max)
 
-    pre_patch_pairs = list(zip(all_release, normalized_labels))
+    pre_patch_pairs = list(zip(all_release, normalized_labels, all_filenames))
 
     # 2) Extract patches (no rotation -- handled by ImageLabelDataset)
     samples = []
-    for release, biofilm_label in pre_patch_pairs:
-        for patch in extract_patches_auto(release, patch_size=patch_size, target_overlap_pct=target_overlap_pct):
+    for release, biofilm_label, _fname in pre_patch_pairs:
+        for patch in extract_patches_auto(release, patch_size=patch_size):
             samples.append((patch, biofilm_label))
 
     # apply transform
@@ -136,7 +129,6 @@ def _build_pairs_keyence(
 def _build_pairs_spinning_disk(
     raw_pairs,
     patch_size,
-    target_overlap_pct,
     transform_name,
     label_min=None,
     label_max=None,
@@ -149,9 +141,8 @@ def _build_pairs_spinning_disk(
     on-the-fly by ImageLabelDataset instead.
 
     Args:
-        raw_pairs: List of (release_image, biomass) tuples.
+        raw_pairs: List of (release_image, biomass, filename) tuples.
         patch_size: Pixel size of the patches.
-        target_overlap_pct: Target overlap percentage for patch extraction.
         transform_name: Name of the transform to apply ("none", "fft_dct", "mexican_hat").
         label_min: Minimum label value for normalization (optional).
         label_max: Maximum label value for normalization (optional).
@@ -163,7 +154,8 @@ def _build_pairs_spinning_disk(
     # 1) Per-image normalization + collect labels
     all_release = []
     all_labels = []
-    for release, biomass in raw_pairs:
+    all_filenames = []
+    for release, biomass, fname in raw_pairs:
         # Convert to grayscale if multi-channel
         if release.ndim == 3:
             grayscale = cv2.cvtColor(release, cv2.COLOR_BGR2GRAY)
@@ -175,18 +167,19 @@ def _build_pairs_spinning_disk(
         normalized_release = grayscale / max_val if max_val > 0 else grayscale
         all_release.append(normalized_release)
         all_labels.append(biomass)
+        all_filenames.append(fname)
 
     # Normalize labels to [0, 1]
     normalized_labels, label_min, label_max = normalize_labels(
         all_labels, min_val=label_min, max_val=label_max
     )
 
-    pre_patch_pairs = list(zip(all_release, normalized_labels))
+    pre_patch_pairs = list(zip(all_release, normalized_labels, all_filenames))
 
     # 2) Extract patches (no rotation -- handled by ImageLabelDataset)
     samples = []
-    for release, label in pre_patch_pairs:
-        for patch in extract_patches_auto(release, patch_size=patch_size, target_overlap_pct=target_overlap_pct):
+    for release, label, _fname in pre_patch_pairs:
+        for patch in extract_patches_auto(release, patch_size=patch_size):
             samples.append((patch, label))
 
     # Apply transform
@@ -258,9 +251,9 @@ def get_dataloaders(root, cfg):
 
     # ---- Load raw pairs (data-source specific) ----
     if data_source == "keyence":
-        biofilm_images = load_keyence_images(f"{root}/biofilm")
-        release_images = load_keyence_images(f"{root}/release")
-        raw_pairs = list(zip(biofilm_images, release_images))
+        biofilm_pairs = load_keyence_images(f"{root}/biofilm")
+        release_pairs = load_keyence_images(f"{root}/release")
+        raw_pairs = [(bio_img, rel_img, rel_name) for (bio_img, _bio_name), (rel_img, rel_name) in zip(biofilm_pairs, release_pairs)]
     elif data_source == "spinning_disk":
         raw_pairs = _load_spinning_disk_2d_pairs(root)
     else:
@@ -275,31 +268,19 @@ def get_dataloaders(root, cfg):
         train_samples, train_min, train_max, _ = _build_pairs_keyence(
             raw_pairs=train_raw,
             patch_size=cfg["patch_size"],
-            target_overlap_pct=cfg["target_overlap_pct"],
             transform_name=cfg["transform_name"],
-            threshold_method=cfg["threshold_method"],
-            blur_method=cfg["blur_method"],
-            enhancement_method=cfg["enhancement_method"],
         )
         validation_samples, _, _, validation_full_pairs = _build_pairs_keyence(
             raw_pairs=validation_raw,
             patch_size=cfg["patch_size"],
-            target_overlap_pct=cfg["target_overlap_pct"],
             transform_name=cfg["transform_name"],
-            threshold_method=cfg["threshold_method"],
-            blur_method=cfg["blur_method"],
-            enhancement_method=cfg["enhancement_method"],
             label_min=train_min,
             label_max=train_max,
         )
         test_samples, _, _, test_full_pairs = _build_pairs_keyence(
             raw_pairs=test_raw,
             patch_size=cfg["patch_size"],
-            target_overlap_pct=cfg["target_overlap_pct"],
             transform_name=cfg["transform_name"],
-            threshold_method=cfg["threshold_method"],
-            blur_method=cfg["blur_method"],
-            enhancement_method=cfg["enhancement_method"],
             label_min=train_min,
             label_max=train_max,
         )
@@ -307,13 +288,11 @@ def get_dataloaders(root, cfg):
         train_samples, train_min, train_max, _ = _build_pairs_spinning_disk(
             raw_pairs=train_raw,
             patch_size=cfg["patch_size"],
-            target_overlap_pct=cfg["target_overlap_pct"],
             transform_name=cfg["transform_name"],
         )
         validation_samples, _, _, validation_full_pairs = _build_pairs_spinning_disk(
             raw_pairs=validation_raw,
             patch_size=cfg["patch_size"],
-            target_overlap_pct=cfg["target_overlap_pct"],
             transform_name=cfg["transform_name"],
             label_min=train_min,
             label_max=train_max,
@@ -321,7 +300,6 @@ def get_dataloaders(root, cfg):
         test_samples, _, _, test_full_pairs = _build_pairs_spinning_disk(
             raw_pairs=test_raw,
             patch_size=cfg["patch_size"],
-            target_overlap_pct=cfg["target_overlap_pct"],
             transform_name=cfg["transform_name"],
             label_min=train_min,
             label_max=train_max,
@@ -389,48 +367,80 @@ def _make_loaders(train_samples, val_samples, batch_size):
     return train_loader, val_loader
 
 
-def get_kfold_data(root, cfg, n_folds=5):
+def _extract_labels_for_stratification(raw_pairs, data_source, cfg):
+    """Extract labels from raw_pairs for stratified splitting.
+
+    For spinning disk, labels are the biomass values (already in tuple).
+    For keyence, labels require running biofilm preprocessing + surface area.
+    """
+    if data_source == "spinning_disk":
+        return [biomass for _, biomass, _ in raw_pairs]
+    else:  # keyence
+        labels = []
+        for biofilm, _release, _fname in raw_pairs:
+            preprocessed = preprocess_biofilm(biofilm)
+            sa = get_surface_area(preprocessed)
+            labels.append(sa)
+        return labels
+
+
+def get_kfold_data(root, cfg, n_folds=3):
     """
     Build k-fold cross-validation data with a held-out test set.
 
     Flow:
         1. Load all raw pairs.
-        2. Hold out 10% as a fixed test set.
-        3. K-Fold split the remaining 90% into train/val for each fold.
+        2. Hold out 20% as a fixed test set (stratified by label quartiles).
+        3. K-Fold split the remaining 80% into train/val for each fold.
         4. Build (patch, label) samples per fold.
 
     Args:
         root: Root directory containing data.
         cfg: Configuration dict (must include 'data_source', 'patch_size',
-             'target_overlap_pct', 'transform_name', 'batch_size').
+             'transform_name', 'batch_size').
         n_folds: Number of cross-validation folds.
 
     Returns:
-        Tuple of (folds, test_raw) where:
+        Tuple of (folds, test_raw, trainval_raw) where:
           - folds: list of (train_loader, val_loader, val_full_pairs, label_min, label_max)
           - test_raw: list of held-out raw pairs for final evaluation
+          - trainval_raw: list of train+val raw pairs for final retraining
     """
     data_source = cfg["data_source"]
 
     # ---- Load all raw pairs ----
     if data_source == "keyence":
-        biofilm_images = load_keyence_images(f"{root}/biofilm")
-        release_images = load_keyence_images(f"{root}/release")
-        raw_pairs = list(zip(biofilm_images, release_images))
+        biofilm_pairs = load_keyence_images(f"{root}/biofilm")
+        release_pairs = load_keyence_images(f"{root}/release")
+        raw_pairs = [(bio_img, rel_img, rel_name) for (bio_img, _bio_name), (rel_img, rel_name) in zip(biofilm_pairs, release_pairs)]
     elif data_source == "spinning_disk":
         raw_pairs = _load_spinning_disk_2d_pairs(root)
     else:
         raise ValueError(f"Unknown data_source: {data_source}")
 
-    # ---- Hold out 10% as fixed test set ----
+    if len(raw_pairs) == 0:
+        raise RuntimeError(
+            f"No images found for data_source='{data_source}' in root='{root}'. "
+            f"Check that the data directory exists and contains the expected files."
+        )
+
+    # ---- Extract labels for stratified split ----
+    labels_for_stratify = _extract_labels_for_stratification(raw_pairs, data_source, cfg)
+    n_bins = 4
+    percentiles = np.linspace(0, 100, n_bins + 1)[1:-1]
+    bin_edges = np.percentile(labels_for_stratify, percentiles)
+    bins = np.digitize(labels_for_stratify, bin_edges)
+
+    # ---- Hold out 20% as fixed test set (stratified) ----
     trainval_raw, test_raw = train_test_split(
-        raw_pairs, train_size=0.9, random_state=42, shuffle=True,
+        raw_pairs, train_size=0.80, random_state=42, shuffle=True,
+        stratify=bins,
     )
 
     print(f"Total images: {len(raw_pairs)} | "
           f"Train+Val: {len(trainval_raw)} | Test: {len(test_raw)}")
 
-    # ---- K-Fold on the remaining 90% ----
+    # ---- K-Fold on the remaining 80% ----
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
     trainval_arr = np.array(trainval_raw, dtype=object)
 
@@ -444,20 +454,12 @@ def get_kfold_data(root, cfg, n_folds=5):
             train_samples, train_min, train_max, _ = _build_pairs_keyence(
                 raw_pairs=train_raw,
                 patch_size=cfg["patch_size"],
-                target_overlap_pct=cfg["target_overlap_pct"],
                 transform_name=cfg["transform_name"],
-                threshold_method=cfg["threshold_method"],
-                blur_method=cfg["blur_method"],
-                enhancement_method=cfg["enhancement_method"],
             )
             val_samples, _, _, val_full_pairs = _build_pairs_keyence(
                 raw_pairs=val_raw,
                 patch_size=cfg["patch_size"],
-                target_overlap_pct=cfg["target_overlap_pct"],
                 transform_name=cfg["transform_name"],
-                threshold_method=cfg["threshold_method"],
-                blur_method=cfg["blur_method"],
-                enhancement_method=cfg["enhancement_method"],
                 label_min=train_min,
                 label_max=train_max,
             )
@@ -465,13 +467,11 @@ def get_kfold_data(root, cfg, n_folds=5):
             train_samples, train_min, train_max, _ = _build_pairs_spinning_disk(
                 raw_pairs=train_raw,
                 patch_size=cfg["patch_size"],
-                target_overlap_pct=cfg["target_overlap_pct"],
                 transform_name=cfg["transform_name"],
             )
             val_samples, _, _, val_full_pairs = _build_pairs_spinning_disk(
                 raw_pairs=val_raw,
                 patch_size=cfg["patch_size"],
-                target_overlap_pct=cfg["target_overlap_pct"],
                 transform_name=cfg["transform_name"],
                 label_min=train_min,
                 label_max=train_max,
@@ -487,4 +487,4 @@ def get_kfold_data(root, cfg, n_folds=5):
 
         folds.append((train_loader, val_loader, val_full_pairs, train_min, train_max))
 
-    return folds, test_raw
+    return folds, test_raw, trainval_raw

@@ -1,6 +1,31 @@
 """
-Comprehensive overview of total spinning disk data: counts and biomass stats
-overall, by treatment (condition), and by month. Uses biofilm/release_biomass_mapping.csv.
+Sanity-check / dataset-summary script for the Spinning Disk dataset.
+
+WHEN TO USE THIS SCRIPT
+-----------------------
+Run this whenever you want a quick health check on the spinning-disk dataset,
+for example:
+- on a fresh checkout of the data directory, to confirm
+  `release_biomass_mapping.csv` and the `release/2D/` images are aligned,
+- before kicking off a sweep, to sanity-check that the biomass distribution
+  looks reasonable,
+- when debugging odd training results and you want to know if a particular
+  treatment or month is over/under-represented.
+
+This script is NOT part of the training pipeline — it never trains a model.
+Skip it if you just want to run sweeps.
+
+WHAT IT DOES
+------------
+Reads `data/spinning_disk/processed/biofilm/release_biomass_mapping.csv` (the
+ground-truth biomass labels) and prints summary tables of:
+- total image counts,
+- counts and biomass stats grouped by treatment (condition),
+- counts and biomass stats grouped by month.
+
+Unlike the Keyence version, this script does not need to load any TIFFs —
+biomass labels are pre-computed and stored in the CSV. Optional flags can
+dump the summary as CSV and produce histograms of the biomass distribution.
 
 Usage:
   python scripts/analyze_spinning_disk_data.py

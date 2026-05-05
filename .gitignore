@@ -1,21 +1,5 @@
-# Python-generated files
 __pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-
-# Data files (too large for GitHub)
+.venv/
 data/
-*.tif
-*.tiff
-*.npy
-*.xlsx
-
-# Model artifacts
-best_model.pth
+wandb/
 

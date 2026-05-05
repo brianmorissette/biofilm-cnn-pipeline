@@ -1,20 +1,24 @@
-method: grid
-
+method: bayes
+ 
 metric: 
-  name: val/full_image_mape
+  name: val/mean_loss
   goal: minimize
-  
+ 
 parameters:
   # Data parameters
   data_source:
-    value: ["keyence"]
+    value: keyence
+
   # Release Cell preprocessing parameters
   patch_size:
-    values: [64, 80, 128, 160]
-  target_overlap_pct:
-    values: [0.0, 0.25, 0.5]
+    values: [64, 128, 256]
   transform_name:
-    values: ["none", "fft_dct", "mexican_hat"]
+    value: none
+
+  # K-Fold cross validation
+  n_folds:
+    value: 3
+
   # Model Architecture parameters
   num_layers:
     values: [3, 4, 5]
@@ -25,7 +29,8 @@ parameters:
   regressor_hidden_size:
     values: [64, 128, 256]
   dropout:
-    values: [0.2, 0.5]
+    values: [0.1, 0.3, 0.5]
+    
   # Model Training parameters
   learning_rate:
     distribution: log_uniform_values
@@ -33,17 +38,15 @@ parameters:
     max: 0.001
   weight_decay:
     distribution: log_uniform_values
-    min: 1e-5
+    min: 1e-4
     max: 1e-2
   batch_size:
     values: [16, 32, 64]
   epochs:
-    values: [100, 200, 1000]
-
-
+    value: 300
+ 
+run_cap: 100
+ 
 program: src/train.py
-
-project: biofilm-cnn-pipeline-sweep-v2
-
-
-
+ 
+project: biofilm-cnn-pipeline-sweep-keyence-v3
