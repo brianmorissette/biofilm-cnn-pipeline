@@ -1,12 +1,38 @@
+"""
+One-time setup script: organize raw Keyence microscope output into the layout
+that the training pipeline expects.
+
+WHEN TO USE THIS SCRIPT
+-----------------------
+Run this only once, when bootstrapping a fresh copy of the Keyence dataset
+straight from the lab's Google Drive dump. After this script has been run and
+`data/keyence/processed/` exists with `biofilm/` and `release/` subfolders,
+you never need to run it again.
+
+WHAT IT DOES
+------------
+The raw Keyence data on Google Drive is organized by date/treatment/magnification,
+with biofilm images at 20x and release-cell images at 60x in parallel folder
+trees. The CNN pipeline expects everything flattened into two folders
+(`biofilm/` and `release/`) with paired filenames. This script walks the raw
+tree, matches biofilm/release pairs by their XY position, and copies only the
+paired images into the output layout.
+
+Step 1 (manual): pull the raw data from Google Drive with rclone:
+    rclone copy gdrive:"MQP Data" ./raw_data \\
+        --drive-shared-with-me \\
+        --include "*20x*100*" \\
+        --include "*60x*160*" \\
+        --progress
+
+Step 2: edit the source/output paths at the bottom of this file and run it.
+By default it runs in dry-run mode; flip `dry_run=False` to actually copy.
+"""
+
 import os
 import shutil
 from pathlib import Path
 from collections import defaultdict
-
-# ------------------------------------------------------------------------------------------------
-# rclone script
-# rclone copy gdrive:"MQP Data" ./raw_data_new_ --drive-shared-with-me --include "*20x*100*" --include "*60x*160*" --progress
-# ------------------------------------------------------------------------------------------------
 
 def reorganize_raw_data_paired(source_dir, output_dir, dry_run=True):
     """

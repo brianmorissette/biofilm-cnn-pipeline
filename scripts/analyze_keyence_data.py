@@ -1,8 +1,32 @@
 """
-Comprehensive overview of total Keyence data: counts and surface area (biomass) stats
-overall, by treatment (condition), and by month. Same output format as
-analyze_spinning_disk_data.py. Loads biofilm/release images and computes surface
-area from biofilm preprocessing.
+Sanity-check / dataset-summary script for the Keyence dataset.
+
+WHEN TO USE THIS SCRIPT
+-----------------------
+Run this whenever you want a quick health check on the Keyence dataset, for
+example:
+- after bootstrapping the dataset with `organize_keyence_data.py` to confirm
+  it loaded correctly,
+- before kicking off a sweep, to sanity-check that the surface-area label
+  distribution looks reasonable,
+- when debugging odd training results and you want to know if a particular
+  treatment or month is over/under-represented.
+
+This script is NOT part of the training pipeline — it never trains a model.
+Skip it if you just want to run sweeps.
+
+WHAT IT DOES
+------------
+Loads paired biofilm/release images from `data/keyence/processed/`, computes
+surface-area labels via the same biofilm preprocessing the training pipeline
+uses (CLAHE + IsoData thresholding from `src/biofilm_preprocess.py`), and
+prints summary tables of:
+- total image-pair counts,
+- counts and surface-area stats grouped by treatment (condition),
+- counts and surface-area stats grouped by month.
+
+Optional flags can dump the summary as CSV and produce histograms of the
+surface-area distribution.
 
 Usage:
   python scripts/analyze_keyence_data.py
